@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/pressly/goose"
 	"log"
@@ -13,14 +14,16 @@ import (
 
 func main() {
 
+	dbMigrate()
+
 	router := mux.NewRouter()
-	router.HandleFunc("/", homepage).Methods("GET")
 	router.HandleFunc("/flag", createFeatureFlag).Methods("POST")
 	router.HandleFunc("/flags", getFeatureFlags).Methods("GET")
+	router.HandleFunc("/", homepage).Methods("GET")
 
 	log.Println("Listening for requests")
-	log.Println("http://localhost:8000")
-	log.Fatal(http.ListenAndServe(":8000", router))
+	log.Println("http://localhost:8001")
+	log.Fatal(http.ListenAndServe(":8001", router))
 }
 
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
@@ -37,10 +40,12 @@ func homepage(w http.ResponseWriter, r *http.Request) {
 }
 
 type FeatureFlag struct {
-	Name       string `json:"name"`
-	Slug       string `json:"slug"`
-	Status     string `json:"status"`
-	Percentage int    `json:"percentage"`
+	Id          string `json:"id"`
+	Name        string `json:"name"`
+	Slug        string `json:"slug"`
+	Description string `json:"description"`
+	Status      string `json:"status"`
+	Percentage  int    `json:"percentage"`
 }
 
 func createFeatureFlag(w http.ResponseWriter, r *http.Request) {
@@ -51,10 +56,49 @@ func createFeatureFlag(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic("Invalid Params")
 	}
+
+	ff.Id = uuid.New().String()
+
+	db, _ := dbOpen()
+	defer db.Close()
+
+	fmt.Println(ff)
+
+	insert, _ := db.Query("REPLACE INTO feature_flag VALUES (?, ?, ?, ?, ?, ?)", ff.Id, ff.Name, ff.Slug, ff.Description, ff.Status, ff.Percentage)
+
+	defer func(insert *sql.Rows) {
+		err := insert.Close()
+		if err != nil {
+
+		}
+	}(insert)
+
+	respondWithJSON(w, 201, ff)
 }
 
 func getFeatureFlags(w http.ResponseWriter, r *http.Request) {
+	db, _ := dbOpen()
+	defer db.Close()
 
+	results, _ := db.Query("SELECT * FROM feature_flags")
+
+	respondWithJSON(w, 200, results)
+	return
+
+	var flags []FeatureFlag
+
+	for results.Next() {
+		var ff FeatureFlag
+		err := results.Scan(&ff.Id, &ff.Name, &ff.Slug, &ff.Description, &ff.Status, &ff.Percentage)
+
+		if err != nil {
+			panic("Database failure")
+		}
+
+		flags = append(flags, ff)
+	}
+
+	respondWithJSON(w, 200, flags)
 }
 
 func dbMigrate() {
@@ -76,7 +120,8 @@ func dbMigrate() {
 }
 
 func dbOpen() (*sql.DB, error) {
-	db, err := sql.Open("mysql", "admin:admin@tcp(127.0.0.1:3306)/lf")
+	fmt.Println("Connect to Database")
+	db, err := sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/lf")
 
 	return db, err
 }
