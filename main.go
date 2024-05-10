@@ -80,10 +80,7 @@ func getFeatureFlags(w http.ResponseWriter, r *http.Request) {
 	db, _ := dbOpen()
 	defer db.Close()
 
-	results, _ := db.Query("SELECT * FROM feature_flags")
-
-	respondWithJSON(w, 200, results)
-	return
+	results, _ := db.Query("SELECT * FROM feature_flag")
 
 	var flags []FeatureFlag
 
@@ -92,7 +89,7 @@ func getFeatureFlags(w http.ResponseWriter, r *http.Request) {
 		err := results.Scan(&ff.Id, &ff.Name, &ff.Slug, &ff.Description, &ff.Status, &ff.Percentage)
 
 		if err != nil {
-			panic("Database failure")
+			panic(err.Error())
 		}
 
 		flags = append(flags, ff)
