@@ -18,6 +18,7 @@ func main() {
 
 	router := mux.NewRouter()
 	router.HandleFunc("/flag", createFeatureFlag).Methods("POST")
+	router.HandleFunc("/flag/{slug}", updateFeatureFlag).Methods("POST")
 	router.HandleFunc("/flags", getFeatureFlags).Methods("GET")
 	router.HandleFunc("/", homepage).Methods("GET")
 
@@ -96,6 +97,25 @@ func getFeatureFlags(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJSON(w, 200, flags)
+}
+
+func updateFeatureFlag(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	w.WriteHeader(http.StatusOK)
+
+	slug := vars["slug"]
+
+	var ff FeatureFlag
+
+	err := json.NewDecoder(r.Body).Decode(&ff)
+
+	if err != nil {
+		panic("Invalid Params")
+	}
+
+	ff.Id = uuid.New().String()
+
+	respondWithJSON(w, 200, slug)
 }
 
 func dbMigrate() {
